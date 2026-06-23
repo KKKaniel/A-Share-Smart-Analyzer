@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>大A智能分析系统</title>
+  <style>
+    :root {
+      --red: #e84040;
+      --green: #18b26e;
+      --blue: #1677ff;
+      --bg: #0d1117;
+      --card: #161b22;
+      --border: #21262d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; min-height: 100vh; }
+    header { background: var(--card); border-bottom: 1px solid var(--border); padding: 20px 40px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 1.4rem; font-weight: 700; color: var(--blue); }
+    header .update { font-size: 0.8rem; color: var(--muted); }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+    .indices { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+    .idx-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+    .idx-card .idx-name { font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }
+    .idx-card .idx-price { font-size: 1.3rem; font-weight: 700; }
+    .idx-card .idx-chg { font-size: 0.85rem; margin-top: 4px; }
+    .up { color: var(--red); } .down { color: var(--green); }
+    .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 14px; padding-left: 10px; border-left: 3px solid var(--blue); }
+    .score-bar-wrap { width: 80px; display: inline-block; background: #21262d; border-radius: 4px; height: 8px; vertical-align: middle; }
+    .score-bar { height: 8px; border-radius: 4px; background: linear-gradient(90deg, #1677ff, #36cfc9); }
+    table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; box-shadow: 0 2px 16px rgba(0,0,0,.3); }
+    thead tr { background: #1c2128; }
+    th { padding: 12px 14px; text-align: left; font-size: 0.8rem; color: var(--muted); font-weight: 500; white-space: nowrap; }
+    td { padding: 11px 14px; font-size: 0.88rem; border-top: 1px solid var(--border); white-space: nowrap; }
+    tr:hover td { background: rgba(22,119,255,.06); }
+    .rank { font-weight: 700; color: var(--muted); width: 36px; }
+    .rank-top { color: var(--blue); }
+    .code { font-family: monospace; color: var(--muted); font-size: 0.8rem; }
+    .name { font-weight: 600; }
+    .score-num { font-weight: 700; color: var(--blue); font-size: 0.9rem; }
+    footer { text-align: center; padding: 30px; color: var(--muted); font-size: 0.78rem; }
+    @media (max-width: 768px) {
+      .indices { grid-template-columns: repeat(2, 1fr); }
+      header { padding: 16px 16px; }
+      .container { padding: 16px 12px; overflow-x: auto; }
+      th, td { padding: 9px 8px; font-size: 0.78rem; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>📈 大A智能分析系统</h1>
+    <div style="font-size:0.78rem;color:var(--muted);margin-top:4px;">A股中小盘智能筛选 · 多维度评分</div>
+  </div>
+  <div class="update">🕐 更新时间：{{ update_time }}</div>
+</header>
+
+<div class="container">
+  <div class="section-title" style="margin-bottom:16px;">📊 主要指数</div>
+  <div class="indices">
+    {% for idx in indices %}
+    <div class="idx-card">
+      <div class="idx-name">{{ idx.name }}</div>
+      <div class="idx-price {{ 'up' if idx.pct_change > 0 else 'down' }}">{{ "{:,.2f}".format(idx.price) }}</div>
+      <div class="idx-chg {{ 'up' if idx.pct_change > 0 else 'down' }}">{{ "{:+.2f}%".format(idx.pct_change) }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="section-title">🏆 中小盘精选 TOP{{ total_count }}（{{ update_date }} 更新）</div>
+  <table>
+    <thead>
+      <tr>
+        <th>排名</th>
+        <th>代码</th>
+        <th>名称</th>
+        <th>最新价</th>
+        <th>涨跌幅</th>
+        <th>市盈率</th>
+        <th>市净率</th>
+        <th>总市值</th>
+        <th>综合评分</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="rank {{ 'rank-top' if r.rank <= 3 else '' }}">{{ r.rank }}</td>
+        <td class="code">{{ r.code }}</td>
+        <td class="name">{{ r.name }}</td>
+        <td>{{ r.price }}</td>
+        <td class="{{ 'up' if r.pct_change > 0 else 'down' }}">{{ r.pct_str }}</td>
+        <td>{{ r.pe }}</td>
+        <td>{{ r.pb }}</td>
+        <td>{{ r.cap }}</td>
+        <td><span class="score-num">{{ r.score }}</span> <span class="score-bar-wrap"><span class="score-bar" style="width:{{ r.score }}%"></span></span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<footer>
+  本页面由 GitHub Actions 自动生成，数据来源 akshare，仅供学习参考，不构成投资建议。<br>
+  <a href="https://github.com/KKKaniel/A-Share-Smart-Analyzer" style="color:#1677ff;">GitHub 仓库</a>
+</footer>
+</body>
+</html>
