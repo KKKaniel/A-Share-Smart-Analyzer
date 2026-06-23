@@ -17,9 +17,10 @@
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: var(--bg); color: var(--text); font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; min-height: 100vh; }
-    header { background: var(--card); border-bottom: 1px solid var(--border); padding: 20px 40px; display: flex; align-items: center; justify-content: space-between; }
+    header { background: var(--card); border-bottom: 1px solid var(--border); padding: 20px 40px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
     header h1 { font-size: 1.4rem; font-weight: 700; color: var(--blue); }
     header .update { font-size: 0.8rem; color: var(--muted); }
+    .header-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
     .container { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
     .indices { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
     .idx-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
@@ -41,21 +42,111 @@
     .name { font-weight: 600; }
     .score-num { font-weight: 700; color: var(--blue); font-size: 0.9rem; }
     footer { text-align: center; padding: 30px; color: var(--muted); font-size: 0.78rem; }
+
+    /* 触发按钮 */
+    #run-btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: var(--blue); color: #fff; border: none; border-radius: 8px;
+      padding: 8px 18px; font-size: 0.88rem; font-weight: 600;
+      cursor: pointer; transition: background .2s, opacity .2s;
+      white-space: nowrap;
+    }
+    #run-btn:hover:not(:disabled) { background: #0958d9; }
+    #run-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    #run-btn .spinner {
+      width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin .7s linear infinite; display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #run-status {
+      font-size: 0.8rem; color: var(--muted); margin-top: 4px;
+      min-height: 18px; text-align: right;
+    }
+    #run-status.ok  { color: var(--green); }
+    #run-status.err { color: var(--red); }
+
+    /* Token 输入弹窗 */
+    #token-modal {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.7); z-index: 999;
+      align-items: center; justify-content: center;
+    }
+    #token-modal.show { display: flex; }
+    .modal-box {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 28px 32px; width: 400px; max-width: 92vw;
+    }
+    .modal-box h3 { font-size: 1rem; margin-bottom: 8px; }
+    .modal-box p  { font-size: 0.82rem; color: var(--muted); margin-bottom: 16px; line-height: 1.6; }
+    .modal-box input {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 9px 12px; color: var(--text);
+      font-size: 0.88rem; outline: none; margin-bottom: 14px;
+    }
+    .modal-box input:focus { border-color: var(--blue); }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .btn-cancel {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); border-radius: 8px;
+      padding: 7px 16px; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-confirm {
+      background: var(--blue); border: none; color: #fff;
+      border-radius: 8px; padding: 7px 18px;
+      cursor: pointer; font-size: 0.85rem; font-weight: 600;
+    }
+    .modal-box .tip {
+      font-size: 0.75rem; color: var(--muted); margin-top: 10px;
+    }
+    .modal-box .tip a { color: var(--blue); }
+
     @media (max-width: 768px) {
       .indices { grid-template-columns: repeat(2, 1fr); }
-      header { padding: 16px 16px; }
+      header { padding: 16px; }
       .container { padding: 16px 12px; overflow-x: auto; }
       th, td { padding: 9px 8px; font-size: 0.78rem; }
     }
   </style>
 </head>
 <body>
+
+<!-- Token 弹窗 -->
+<div id="token-modal">
+  <div class="modal-box">
+    <h3>🔑 输入 GitHub Token</h3>
+    <p>需要具有 <strong>repo / workflow</strong> 权限的 Personal Access Token，Token 仅存于浏览器本地，不会上传。</p>
+    <input type="password" id="token-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+    <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:var(--muted);margin-bottom:14px;">
+      <input type="checkbox" id="save-token" style="width:auto;margin:0;"> 记住 Token（存储于 localStorage）
+    </label>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-confirm" onclick="confirmTrigger()">确认触发</button>
+    </div>
+    <div class="tip">
+      前往
+      <a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=A-Share-Analyzer" target="_blank">生成 Token</a>
+      （需勾选 repo + workflow 权限）
+    </div>
+  </div>
+</div>
+
 <header>
   <div>
     <h1>📈 大A智能分析系统</h1>
     <div style="font-size:0.78rem;color:var(--muted);margin-top:4px;">A股中小盘智能筛选 · 多维度评分</div>
   </div>
-  <div class="update">🕐 更新时间：{{ update_time }}</div>
+  <div class="header-right">
+    <div>
+      <button id="run-btn" onclick="onRunClick()">
+        <span class="spinner" id="spinner"></span>
+        ⚡ 立即运行分析
+      </button>
+      <div id="run-status"></div>
+    </div>
+    <div class="update">🕐 更新时间：{{ update_time }}</div>
+  </div>
 </header>
 
 <div class="container">
@@ -74,15 +165,8 @@
   <table>
     <thead>
       <tr>
-        <th>排名</th>
-        <th>代码</th>
-        <th>名称</th>
-        <th>最新价</th>
-        <th>涨跌幅</th>
-        <th>市盈率</th>
-        <th>市净率</th>
-        <th>总市值</th>
-        <th>综合评分</th>
+        <th>排名</th><th>代码</th><th>名称</th><th>最新价</th>
+        <th>涨跌幅</th><th>市盈率</th><th>市净率</th><th>总市值</th><th>综合评分</th>
       </tr>
     </thead>
     <tbody>
@@ -107,5 +191,102 @@
   本页面由 GitHub Actions 自动生成，数据来源 akshare，仅供学习参考，不构成投资建议。<br>
   <a href="https://github.com/KKKaniel/A-Share-Smart-Analyzer" style="color:#1677ff;">GitHub 仓库</a>
 </footer>
+
+<script>
+  const OWNER = 'KKKaniel';
+  const REPO  = 'A-Share-Smart-Analyzer';
+  const WORKFLOW = 'analyze.yml';
+
+  const btn      = document.getElementById('run-btn');
+  const spinner  = document.getElementById('spinner');
+  const statusEl = document.getElementById('run-status');
+
+  function setStatus(msg, type = '') {
+    statusEl.textContent = msg;
+    statusEl.className = type;
+  }
+
+  function openModal() {
+    const saved = localStorage.getItem('gh_token');
+    if (saved) document.getElementById('token-input').value = saved;
+    document.getElementById('token-modal').classList.add('show');
+    setTimeout(() => document.getElementById('token-input').focus(), 100);
+  }
+
+  function closeModal() {
+    document.getElementById('token-modal').classList.remove('show');
+  }
+
+  function onRunClick() {
+    const saved = localStorage.getItem('gh_token');
+    if (saved) {
+      triggerWorkflow(saved);
+    } else {
+      openModal();
+    }
+  }
+
+  async function confirmTrigger() {
+    const token = document.getElementById('token-input').value.trim();
+    if (!token) { alert('请输入 Token'); return; }
+    if (document.getElementById('save-token').checked) {
+      localStorage.setItem('gh_token', token);
+    }
+    closeModal();
+    triggerWorkflow(token);
+  }
+
+  async function triggerWorkflow(token) {
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+    setStatus('触发中...', '');
+
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows/${WORKFLOW}/dispatches`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ ref: 'main' })
+        }
+      );
+
+      if (res.status === 204) {
+        setStatus('✅ 已触发！约 2 分钟后刷新页面查看结果', 'ok');
+        setTimeout(() => {
+          btn.disabled = false;
+          spinner.style.display = 'none';
+        }, 30000);
+      } else if (res.status === 401) {
+        localStorage.removeItem('gh_token');
+        setStatus('❌ Token 无效或已过期，请重新输入', 'err');
+        btn.disabled = false; spinner.style.display = 'none';
+      } else if (res.status === 403) {
+        setStatus('❌ Token 权限不足，需要 workflow 权限', 'err');
+        btn.disabled = false; spinner.style.display = 'none';
+      } else {
+        setStatus(`❌ 触发失败 (HTTP ${res.status})`, 'err');
+        btn.disabled = false; spinner.style.display = 'none';
+      }
+    } catch (e) {
+      setStatus('❌ 网络错误，请检查连接', 'err');
+      btn.disabled = false; spinner.style.display = 'none';
+    }
+  }
+
+  // 点击弹窗背景关闭
+  document.getElementById('token-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // Enter 确认
+  document.getElementById('token-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') confirmTrigger();
+  });
+</script>
 </body>
 </html>
