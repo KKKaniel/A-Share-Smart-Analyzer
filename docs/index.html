@@ -5,18 +5,534 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>大A智能分析系统</title>
   <style>
-    body { background: #0d1117; color: #e6edf3; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; text-align: center; }
-    .loading { font-size: 1.2rem; color: #8b949e; }
+    :root {
+      --red: #e84040;
+      --green: #18b26e;
+      --blue: #1677ff;
+      --bg: #0d1117;
+      --card: #161b22;
+      --border: #21262d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; min-height: 100vh; }
+    header { background: var(--card); border-bottom: 1px solid var(--border); padding: 20px 40px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    header h1 { font-size: 1.4rem; font-weight: 700; color: var(--blue); }
+    header .update { font-size: 0.8rem; color: var(--muted); }
+    .header-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+    .indices { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+    .idx-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+    .idx-card .idx-name { font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }
+    .idx-card .idx-price { font-size: 1.3rem; font-weight: 700; }
+    .idx-card .idx-chg { font-size: 0.85rem; margin-top: 4px; }
+    .up { color: var(--red); } .down { color: var(--green); }
+    .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 14px; padding-left: 10px; border-left: 3px solid var(--blue); }
+    .score-bar-wrap { width: 80px; display: inline-block; background: #21262d; border-radius: 4px; height: 8px; vertical-align: middle; }
+    .score-bar { height: 8px; border-radius: 4px; background: linear-gradient(90deg, #1677ff, #36cfc9); }
+    table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; box-shadow: 0 2px 16px rgba(0,0,0,.3); }
+    thead tr { background: #1c2128; }
+    th { padding: 12px 14px; text-align: left; font-size: 0.8rem; color: var(--muted); font-weight: 500; white-space: nowrap; }
+    td { padding: 11px 14px; font-size: 0.88rem; border-top: 1px solid var(--border); white-space: nowrap; }
+    tr:hover td { background: rgba(22,119,255,.06); }
+    .rank { font-weight: 700; color: var(--muted); width: 36px; }
+    .rank-top { color: var(--blue); }
+    .code { font-family: monospace; color: var(--muted); font-size: 0.8rem; }
+    .name { font-weight: 600; }
+    .score-num { font-weight: 700; color: var(--blue); font-size: 0.9rem; }
+    footer { text-align: center; padding: 30px; color: var(--muted); font-size: 0.78rem; }
+
+    /* 触发按钮 */
+    #run-btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: var(--blue); color: #fff; border: none; border-radius: 8px;
+      padding: 8px 18px; font-size: 0.88rem; font-weight: 600;
+      cursor: pointer; transition: background .2s, opacity .2s;
+      white-space: nowrap;
+    }
+    #run-btn:hover:not(:disabled) { background: #0958d9; }
+    #run-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    #run-btn .spinner {
+      width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin .7s linear infinite; display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #run-status {
+      font-size: 0.8rem; color: var(--muted); margin-top: 4px;
+      min-height: 18px; text-align: right;
+    }
+    #run-status.ok  { color: var(--green); }
+    #run-status.err { color: var(--red); }
+
+    /* Token 输入弹窗 */
+    #token-modal {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.7); z-index: 999;
+      align-items: center; justify-content: center;
+    }
+    #token-modal.show { display: flex; }
+    .modal-box {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 28px 32px; width: 400px; max-width: 92vw;
+    }
+    .modal-box h3 { font-size: 1rem; margin-bottom: 8px; }
+    .modal-box p  { font-size: 0.82rem; color: var(--muted); margin-bottom: 16px; line-height: 1.6; }
+    .modal-box input {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 9px 12px; color: var(--text);
+      font-size: 0.88rem; outline: none; margin-bottom: 14px;
+    }
+    .modal-box input:focus { border-color: var(--blue); }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .btn-cancel {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); border-radius: 8px;
+      padding: 7px 16px; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-confirm {
+      background: var(--blue); border: none; color: #fff;
+      border-radius: 8px; padding: 7px 18px;
+      cursor: pointer; font-size: 0.85rem; font-weight: 600;
+    }
+    .modal-box .tip {
+      font-size: 0.75rem; color: var(--muted); margin-top: 10px;
+    }
+    .modal-box .tip a { color: var(--blue); }
+
+    @media (max-width: 768px) {
+      .indices { grid-template-columns: repeat(2, 1fr); }
+      header { padding: 16px; }
+      .container { padding: 16px 12px; overflow-x: auto; }
+      th, td { padding: 9px 8px; font-size: 0.78rem; }
+    }
   </style>
 </head>
 <body>
-  <div>
-    <div style="font-size:3rem;">📈</div>
-    <div class="loading">大A智能分析系统部署中...</div>
-    <div style="margin-top:12px;font-size:0.85rem;color:#8b949e;">等待 GitHub Actions 首次运行生成报告</div>
-    <div style="margin-top:20px;">
-      <a href="https://github.com/KKKaniel/A-Share-Smart-Analyzer/actions" style="color:#1677ff;font-size:0.9rem;">查看 Actions 运行状态 →</a>
+
+<!-- Token 弹窗 -->
+<div id="token-modal">
+  <div class="modal-box">
+    <h3>🔑 输入 GitHub Token</h3>
+    <p>需要具有 <strong>repo / workflow</strong> 权限的 Personal Access Token，Token 仅存于浏览器本地，不会上传。</p>
+    <input type="password" id="token-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+    <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:var(--muted);margin-bottom:14px;">
+      <input type="checkbox" id="save-token" style="width:auto;margin:0;"> 记住 Token（存储于 localStorage）
+    </label>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-confirm" onclick="confirmTrigger()">确认触发</button>
+    </div>
+    <div class="tip">
+      前往
+      <a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=A-Share-Analyzer" target="_blank">生成 Token</a>
+      （需勾选 repo + workflow 权限）
     </div>
   </div>
+</div>
+
+<header>
+  <div>
+    <h1>📈 大A智能分析系统</h1>
+    <div style="font-size:0.78rem;color:var(--muted);margin-top:4px;">A股中小盘智能筛选 · 多维度评分</div>
+  </div>
+  <div class="header-right">
+    <div>
+      <button id="run-btn" onclick="onRunClick()">
+        <span class="spinner" id="spinner"></span>
+        ⚡ 立即运行分析
+      </button>
+      <div id="run-status"></div>
+    </div>
+    <div class="update">🕐 更新时间：2026-06-29 06:25</div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="section-title" style="margin-bottom:16px;">📊 主要指数</div>
+  <div class="indices">
+    
+    <div class="idx-card">
+      <div class="idx-name">上证指数</div>
+      <div class="idx-price up">4,048.94</div>
+      <div class="idx-chg up">+0.54%</div>
+    </div>
+    
+    <div class="idx-card">
+      <div class="idx-name">深证成指</div>
+      <div class="idx-price down">0.00</div>
+      <div class="idx-chg down">+0.00%</div>
+    </div>
+    
+    <div class="idx-card">
+      <div class="idx-name">创业板指</div>
+      <div class="idx-price down">0.00</div>
+      <div class="idx-chg down">+0.00%</div>
+    </div>
+    
+    <div class="idx-card">
+      <div class="idx-name">中证500</div>
+      <div class="idx-price up">8,757.67</div>
+      <div class="idx-chg up">+0.62%</div>
+    </div>
+    
+  </div>
+
+  <div class="section-title">🏆 中小盘精选 TOP20（2026年06月29日 更新）</div>
+  <table>
+    <thead>
+      <tr>
+        <th>排名</th><th>代码</th><th>名称</th><th>最新价</th>
+        <th>涨跌幅</th><th>市盈率</th><th>市净率</th><th>总市值</th><th>综合评分</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+      <tr>
+        <td class="rank rank-top">1</td>
+        <td class="code">300434</td>
+        <td class="name">金石亚药</td>
+        <td>10.81</td>
+        <td class="up">+19.98%</td>
+        <td>9.4</td>
+        <td>1.65</td>
+        <td>43.4亿</td>
+        <td><span class="score-num">72.49</span> <span class="score-bar-wrap"><span class="score-bar" style="width:72.49%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank rank-top">2</td>
+        <td class="code">002582</td>
+        <td class="name">好想你</td>
+        <td>8.69</td>
+        <td class="up">+0.93%</td>
+        <td>0.9</td>
+        <td>0.80</td>
+        <td>38.9亿</td>
+        <td><span class="score-num">65.32</span> <span class="score-bar-wrap"><span class="score-bar" style="width:65.32%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank rank-top">3</td>
+        <td class="code">603518</td>
+        <td class="name">锦泓集团</td>
+        <td>7.27</td>
+        <td class="up">+0.97%</td>
+        <td>5.7</td>
+        <td>0.65</td>
+        <td>25.1亿</td>
+        <td><span class="score-num">64.55</span> <span class="score-bar-wrap"><span class="score-bar" style="width:64.55%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">4</td>
+        <td class="code">600638</td>
+        <td class="name">新黄浦</td>
+        <td>4.49</td>
+        <td class="up">+1.13%</td>
+        <td>5.5</td>
+        <td>0.65</td>
+        <td>30.2亿</td>
+        <td><span class="score-num">64.36</span> <span class="score-bar-wrap"><span class="score-bar" style="width:64.36%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">5</td>
+        <td class="code">000404</td>
+        <td class="name">长虹华意</td>
+        <td>8.02</td>
+        <td class="up">+8.23%</td>
+        <td>12.1</td>
+        <td>1.33</td>
+        <td>55.8亿</td>
+        <td><span class="score-num">63.5</span> <span class="score-bar-wrap"><span class="score-bar" style="width:63.5%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">6</td>
+        <td class="code">600694</td>
+        <td class="name">大商股份</td>
+        <td>13.54</td>
+        <td class="up">+1.58%</td>
+        <td>4.7</td>
+        <td>0.58</td>
+        <td>51.3亿</td>
+        <td><span class="score-num">63.43</span> <span class="score-bar-wrap"><span class="score-bar" style="width:63.43%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">7</td>
+        <td class="code">000906</td>
+        <td class="name">浙商中拓</td>
+        <td>5.13</td>
+        <td class="up">+0.98%</td>
+        <td>4.9</td>
+        <td>0.75</td>
+        <td>36.4亿</td>
+        <td><span class="score-num">63.41</span> <span class="score-bar-wrap"><span class="score-bar" style="width:63.41%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">8</td>
+        <td class="code">920017</td>
+        <td class="name">星昊医药</td>
+        <td>16.91</td>
+        <td class="up">+9.31%</td>
+        <td>16.5</td>
+        <td>1.30</td>
+        <td>21.0亿</td>
+        <td><span class="score-num">63.2</span> <span class="score-bar-wrap"><span class="score-bar" style="width:63.2%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">9</td>
+        <td class="code">600858</td>
+        <td class="name">银座股份</td>
+        <td>4.45</td>
+        <td class="up">+0.91%</td>
+        <td>8.2</td>
+        <td>0.84</td>
+        <td>23.1亿</td>
+        <td><span class="score-num">62.78</span> <span class="score-bar-wrap"><span class="score-bar" style="width:62.78%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">10</td>
+        <td class="code">000501</td>
+        <td class="name">武商集团</td>
+        <td>6.72</td>
+        <td class="up">+3.38%</td>
+        <td>10.5</td>
+        <td>0.47</td>
+        <td>51.7亿</td>
+        <td><span class="score-num">62.75</span> <span class="score-bar-wrap"><span class="score-bar" style="width:62.75%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">11</td>
+        <td class="code">600790</td>
+        <td class="name">轻纺城</td>
+        <td>3.31</td>
+        <td class="down">+0.00%</td>
+        <td>3.5</td>
+        <td>0.82</td>
+        <td>48.5亿</td>
+        <td><span class="score-num">62.16</span> <span class="score-bar-wrap"><span class="score-bar" style="width:62.16%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">12</td>
+        <td class="code">603367</td>
+        <td class="name">辰欣药业</td>
+        <td>13.18</td>
+        <td class="up">+5.86%</td>
+        <td>11.4</td>
+        <td>0.95</td>
+        <td>59.7亿</td>
+        <td><span class="score-num">62.16</span> <span class="score-bar-wrap"><span class="score-bar" style="width:62.16%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">13</td>
+        <td class="code">603368</td>
+        <td class="name">柳药集团</td>
+        <td>15.05</td>
+        <td class="up">+3.15%</td>
+        <td>6.7</td>
+        <td>0.77</td>
+        <td>59.8亿</td>
+        <td><span class="score-num">62.13</span> <span class="score-bar-wrap"><span class="score-bar" style="width:62.13%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">14</td>
+        <td class="code">600035</td>
+        <td class="name">楚天高速</td>
+        <td>3.43</td>
+        <td class="up">+0.88%</td>
+        <td>5.8</td>
+        <td>0.62</td>
+        <td>55.2亿</td>
+        <td><span class="score-num">61.87</span> <span class="score-bar-wrap"><span class="score-bar" style="width:61.87%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">15</td>
+        <td class="code">000521</td>
+        <td class="name">长虹美菱</td>
+        <td>5.49</td>
+        <td class="up">+10.02%</td>
+        <td>20.1</td>
+        <td>0.96</td>
+        <td>56.5亿</td>
+        <td><span class="score-num">61.7</span> <span class="score-bar-wrap"><span class="score-bar" style="width:61.7%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">16</td>
+        <td class="code">603797</td>
+        <td class="name">联泰环保</td>
+        <td>3.79</td>
+        <td class="down">-0.26%</td>
+        <td>11.3</td>
+        <td>0.65</td>
+        <td>21.9亿</td>
+        <td><span class="score-num">61.48</span> <span class="score-bar-wrap"><span class="score-bar" style="width:61.48%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">17</td>
+        <td class="code">300867</td>
+        <td class="name">圣元环保</td>
+        <td>18.49</td>
+        <td class="up">+4.52%</td>
+        <td>11.2</td>
+        <td>1.26</td>
+        <td>50.2亿</td>
+        <td><span class="score-num">61.17</span> <span class="score-bar-wrap"><span class="score-bar" style="width:61.17%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">18</td>
+        <td class="code">000900</td>
+        <td class="name">现代投资</td>
+        <td>3.50</td>
+        <td class="down">+0.00%</td>
+        <td>8.0</td>
+        <td>0.49</td>
+        <td>53.1亿</td>
+        <td><span class="score-num">61.12</span> <span class="score-bar-wrap"><span class="score-bar" style="width:61.12%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">19</td>
+        <td class="code">002035</td>
+        <td class="name">华帝股份</td>
+        <td>4.56</td>
+        <td class="up">+2.24%</td>
+        <td>9.6</td>
+        <td>1.03</td>
+        <td>38.7亿</td>
+        <td><span class="score-num">60.87</span> <span class="score-bar-wrap"><span class="score-bar" style="width:60.87%"></span></span></td>
+      </tr>
+      
+      <tr>
+        <td class="rank ">20</td>
+        <td class="code">002772</td>
+        <td class="name">众兴菌业</td>
+        <td>11.76</td>
+        <td class="up">+1.38%</td>
+        <td>6.8</td>
+        <td>1.25</td>
+        <td>44.1亿</td>
+        <td><span class="score-num">60.84</span> <span class="score-bar-wrap"><span class="score-bar" style="width:60.84%"></span></span></td>
+      </tr>
+      
+    </tbody>
+  </table>
+</div>
+
+<footer>
+  本页面由 GitHub Actions 自动生成，数据来源 akshare，仅供学习参考，不构成投资建议。<br>
+  <a href="https://github.com/KKKaniel/A-Share-Smart-Analyzer" style="color:#1677ff;">GitHub 仓库</a>
+</footer>
+
+<script>
+  const OWNER = 'KKKaniel';
+  const REPO  = 'A-Share-Smart-Analyzer';
+  const WORKFLOW = 'analyze.yml';
+
+  const btn      = document.getElementById('run-btn');
+  const spinner  = document.getElementById('spinner');
+  const statusEl = document.getElementById('run-status');
+
+  function setStatus(msg, type = '') {
+    statusEl.textContent = msg;
+    statusEl.className = type;
+  }
+
+  function openModal() {
+    const saved = localStorage.getItem('gh_token');
+    if (saved) document.getElementById('token-input').value = saved;
+    document.getElementById('token-modal').classList.add('show');
+    setTimeout(() => document.getElementById('token-input').focus(), 100);
+  }
+
+  function closeModal() {
+    document.getElementById('token-modal').classList.remove('show');
+  }
+
+  function onRunClick() {
+    const saved = localStorage.getItem('gh_token');
+    if (saved) {
+      triggerWorkflow(saved);
+    } else {
+      openModal();
+    }
+  }
+
+  async function confirmTrigger() {
+    const token = document.getElementById('token-input').value.trim();
+    if (!token) { alert('请输入 Token'); return; }
+    if (document.getElementById('save-token').checked) {
+      localStorage.setItem('gh_token', token);
+    }
+    closeModal();
+    triggerWorkflow(token);
+  }
+
+  async function triggerWorkflow(token) {
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+    setStatus('触发中...', '');
+
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows/${WORKFLOW}/dispatches`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ ref: 'main' })
+        }
+      );
+
+      if (res.status === 204) {
+        setStatus('✅ 已触发！约 2 分钟后刷新页面查看结果', 'ok');
+        setTimeout(() => {
+          btn.disabled = false;
+          spinner.style.display = 'none';
+        }, 30000);
+      } else if (res.status === 401) {
+        localStorage.removeItem('gh_token');
+        setStatus('❌ Token 无效或已过期，请重新输入', 'err');
+        btn.disabled = false; spinner.style.display = 'none';
+      } else if (res.status === 403) {
+        setStatus('❌ Token 权限不足，需要 workflow 权限', 'err');
+        btn.disabled = false; spinner.style.display = 'none';
+      } else {
+        setStatus(`❌ 触发失败 (HTTP ${res.status})`, 'err');
+        btn.disabled = false; spinner.style.display = 'none';
+      }
+    } catch (e) {
+      setStatus('❌ 网络错误，请检查连接', 'err');
+      btn.disabled = false; spinner.style.display = 'none';
+    }
+  }
+
+  // 点击弹窗背景关闭
+  document.getElementById('token-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // Enter 确认
+  document.getElementById('token-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') confirmTrigger();
+  });
+</script>
 </body>
 </html>
